@@ -3,6 +3,7 @@ import {
   Alert,
   Button,
   Image,
+  PanResponder,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -15,11 +16,29 @@ import {
   SaveFormat,
   useImageManipulator,
 } from "expo-image-manipulator";
+import { STICKERS } from "@/constants";
 const HomeScreen = () => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-
+  const [drawingMode, setDrawingMode] = useState(false);
+  const [currentPath, setCurrentPath] = useState<
+    { x: number; y: number; color: string }[]
+  >([]);
+  const [currentColor, setCurrentColor] = useState("#FF0000");
+  const [paths, setPaths] = useState<{ x: number; y: number; color: string }[]>(
+    []
+  );
+  const [selectedSticker, setSelectedSticker] = useState<{
+    id: number;
+    stickerId: any;
+    uri: any;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [placedStickers, setPlacedStickers] = useState<
+    { id: number; stickerId: any; uri: any; x: number; y: number }[]
+  >([]);
   const cameraRef = useRef<CameraView | null>(null);
   const context = capturedImage ? useImageManipulator(capturedImage) : null;
 
@@ -37,6 +56,49 @@ const HomeScreen = () => {
       }
     })();
   }, []);
+
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => drawingMode,
+    onMoveShouldSetPanResponder: () => drawingMode,
+    onPanResponderGrant: (event) => {
+      const { locationX, locationY } = event.nativeEvent;
+      setCurrentPath([{ x: locationX, y: locationY, color: currentColor }]);
+    },
+    onPanResponderMove: (event) => {
+      if (drawingMode) {
+        const { locationX, locationY } = event.nativeEvent;
+        setCurrentPath((prevPath) => [
+          ...prevPath,
+          { x: locationX, y: locationY, color: currentColor },
+        ]);
+      }
+    },
+    onPanResponderRelease: () => {
+      if (currentPath.length > 0) {
+        setPaths((prevPaths) => [...prevPaths, ...currentPath]);
+        setCurrentPath([]);
+      }
+    },
+  });
+
+  const stickerPanResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => selectedSticker !== null,
+    onMoveShouldSetPanResponder: () => selectedSticker !== null,
+    onPanResponderGrant: (event) => {
+      if (selectedSticker) {
+        const { locationX, locationY } = event.nativeEvent;
+        const newSticker = {
+          id: Date.now(),
+          stickerId: selectedSticker.id,
+          uri: selectedSticker.uri,
+          x: locationX - 40,
+          y: locationY - 40,
+        };
+        setPlacedStickers((prev) => [...prev, newSticker]);
+        setSelectedSticker(null);
+      }
+    },
+  });
 
   const takePicture = async () => {
     if (cameraRef.current && cameraReady) {
